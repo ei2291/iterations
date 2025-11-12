@@ -1,0 +1,128 @@
+Simulation
+================
+
+## Simulate data
+
+Make fake random data on a computer that behaves like real data, so you
+can see what would happen if you collected samples many times.
+
+# Step 1
+
+``` r
+library(tidyverse)
+set.seed(1)
+```
+
+explanation: - `tidyverse` = loads helpful tools (`dplyr`, `ggplot2`,
+etc.) - `set.seed(1)` = ensures your random numbers are the same each
+time (for reproducibility)
+
+# Step 2
+
+Write a simulation function for mean and sd.
+
+``` r
+sim_mean_sd = function(n, mu=2, sigma=3){
+  
+  sim_data = tibble(
+    x = rnorm(n, mean=mu)
+  )
+  
+  sim_data |> 
+    summarize(
+      mu_hat = mean(x),
+      sigma_hat = sd(x)
+    )
+}
+
+sim_mean_sd(30)
+```
+
+    ## # A tibble: 1 × 2
+    ##   mu_hat sigma_hat
+    ##    <dbl>     <dbl>
+    ## 1   2.08     0.924
+
+explanation: - `n` = no. of data points (sample size) - `mu` = true pop.
+mean. - `sigma` = true pop sd. - `rnorm()` = randomly generate `n` no.
+from a normal distribution - `summarize()` = calculate the sample’s mean
+(mu_hat) and sd(sigma_hat). - return a small table (tibble) with those
+two numbers - test with 30
+
+## Steo 3: Run the simulation 100 times
+
+``` r
+output = vector("list", 100)
+
+for (i in 1:100){
+  output[[i]] = sim_mean_sd(30)
+}
+
+sim_results = bind_rows(output)
+```
+
+explanation: - `vector("list", 100)` makes an empty list with 100
+slots. - the `for` loops repeats 100 times. - each time, it runs
+`sim_mean_sd(30)` (30 observations per sample). - `output[[i]]` saves
+the result of each run. - `bind_rows()` stacks them all together into
+one big data frame. –\> Now you have 100 estimates of mean (mu_hat) and
+sd (sigma_hat).
+
+## Step 4: Do the same thing using map()(Simpler)
+
+instead of the for-loop:
+
+``` r
+sim_results_df=
+  expand_grid(
+    sample_size = 30,
+    iter = 1:100
+  ) |> 
+  mutate(
+    estimate_df = map(sample_size, sim_mean_sd)
+  ) |> 
+  unnest(estimate_df)
+```
+
+explanation: - `expan_grind()` makes a mini data frame with 100 rows
+(`iter` 1-100, `sample_size`= 30 each). - `mutate()` adds a new column
+called `estimate_df`. - `map()` applies the function `sim_mean_sd` to
+each row’s `sample_size`. - `unnest()` pulls the results (means and sds)
+out of the list column into normal columns.
+
+## Step 5: Visualize and summarize results.
+
+Plot the distribution of simulated means:
+
+``` r
+sim_results_df |> 
+  ggplot(aes(x=mu_hat))+
+  geom_density()
+```
+
+<img src="simulation_files/figure-gfm/unnamed-chunk-5-1.png" width="90%" />
+it shows: - the spread of the 100 estimated means (mu_hat). - it looks
+roughly normal (bell-shapped) centered around 2 (the true mean).
+
+Summarize numerically:
+
+``` r
+sim_results_df |> 
+  pivot_longer (mu_hat:sigma_hat, names_to = "parameter", values_to = "estimate") |> 
+  group_by(parameter) |> 
+  summarize(
+    emp_mean = mean(estimate),
+    emp_sd = sd(estimate)
+  ) |> 
+  knitr::kable(digits=3)
+```
+
+| parameter | emp_mean | emp_sd |
+|:----------|---------:|-------:|
+| mu_hat    |    1.995 |  0.189 |
+| sigma_hat |    0.990 |  0.125 |
+
+explanation: - `pivot_longer()` stacks both columns (mu_hat, sigma_hat)
+into one for easier grouping. - `group_by(parameter)` separates results
+for mean and sd. - `summarize()` computes the average of all simulated
+estimates and their spread.
